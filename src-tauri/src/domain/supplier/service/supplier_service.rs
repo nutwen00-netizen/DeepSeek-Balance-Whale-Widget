@@ -510,8 +510,12 @@ pub fn builtin_usage_preset(slug: &str) -> Option<SupplierUsageQuery> {
         "deepseek" => SupplierUsageQuery {
             url_template: "https://api.deepseek.com/user/balance".to_string(),
             extract: UsageExtract {
-                balance: "balance_infos.0.total_balance".to_string(),
-                currency: "balance_infos.0.currency".to_string(),
+                // 余额接口同时回美元与人民币两行（`balance_infos`），账号只在一个
+                // 币种下有钱、另一行是 `0.00` 的占位。用「币种分组」挑余额非零的那行，
+                // 而不是固定取第 0 行（第 0 行常是 $0.00 的美元占位）。
+                balance_group: "balance_infos".to_string(),
+                balance: "total_balance".to_string(),
+                currency: "currency".to_string(),
                 ..UsageExtract::default()
             },
             stats: Some(Box::new(SupplierUsageQuery {
@@ -1747,7 +1751,9 @@ mod tests {
             deepseek.url_template,
             "https://api.deepseek.com/user/balance"
         );
-        assert_eq!(deepseek.extract.currency, "balance_infos.0.currency");
+        assert_eq!(deepseek.extract.balance_group, "balance_infos");
+        assert_eq!(deepseek.extract.balance, "total_balance");
+        assert_eq!(deepseek.extract.currency, "currency");
         assert_eq!(deepseek.extract.scale, 1.0);
         // 余额走官方 API Key；用量统计走控制台的网页登录令牌 —— 两套凭证不许混用。
         assert_eq!(deepseek.token_source, TOKEN_SOURCE_API_KEY);

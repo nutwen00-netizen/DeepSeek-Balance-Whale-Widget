@@ -191,6 +191,46 @@ fn sum_with_wildcard(node: &Value, path: &str) -> Option<f64> {
     }
 }
 
+/// 取响应里的币种字段：统一大写，空串视为没给。
+fn read_currency(body: &Value, path: &str) -> Option<String> {
+    value_at(body, path)
+        .and_then(|value| value.as_str())
+        .map(|text| text.trim().to_ascii_uppercase())
+        .filter(|text| !text.is_empty())
+}
+
+/// 从「币种分组」数组里挑出真正有余额的那一组，返回 `(余额, 币种)`。
+///
+/// 多家平台（如 DeepSeek）会同时返回美元与人民币两行余额，账号实际只在一个
+/// 币种下有钱，另一行是 `0.00` 的占位。固定取第 0 行会把 `$0.00` 当成余额，
+/// 因此改为：优先挑余额**非零**的那一行，全部为零（或取不到）时退回第一行。
+fn select_balance_group(
+    body: &Value,
+    extract: &UsageExtract,
+    scale: f64,
+) -> (Option<f64>, Option<String>) {
+    let Some(entries) = value_at(body, &extract.balance_group).and_then(Value::as_array) else {
+        return (None, None);
+    };
+    if entries.is_empty() {
+        return (None, None);
+    }
+    let mut first: Option<(Option<f64>, Option<String>)> = None;
+    for entry in entries {
+        let parsed = (
+            number_at(entry, &extract.balance).map(|value| value * scale),
+            read_currency(entry, &extract.currency),
+        );
+        if first.is_none() {
+            first = Some(parsed.clone());
+        }
+        if parsed.0.is_some_and(|amount| amount != 0.0) {
+            return parsed;
+        }
+    }
+    first.unwrap_or((None, None))
+}
+
 /// 桶长等于该秒数即表示明细是**小时桶**（官网用量接口在单日窗口下如此应答）。
 const BUCKET_HOUR_SECONDS: i64 = 3600;
 
@@ -450,15 +490,20 @@ pub fn parse_snapshot(body: &Value, query: &SupplierUsageQuery) -> AppResult<Usa
     // 部分平台按最小单位返回金额（如万分之一美元），因此取值后统一乘换算倍率；
     // 倍率已在保存时归一化为正有限数，这里直接用即可。
     let scale = extract.scale;
-    let balance = number_at(body, &extract.balance).map(|value| value * scale);
+    // 币种分组（如 DeepSeek 的 `balance_infos`）：余额 / 币种改为相对分组元素取值，
+    // 并优先挑余额非零的那一组；否则直接按根路径取值（旧行为不变）。
+    let (balance, response_currency) = if extract.balance_group.trim().is_empty() {
+        (
+            number_at(body, &extract.balance).map(|value| value * scale),
+            read_currency(body, &extract.currency),
+        )
+    } else {
+        select_balance_group(body, extract, scale)
+    };
     let used = number_at(body, &extract.used).map(|value| value * scale);
     let total = number_at(body, &extract.total).map(|value| value * scale);
     // 币种优先取响应里的字段；响应没有该字段时用配置兜底，
     // 否则金额会被当成默认币种展示（错误数据比没有数据更糟）。
-    let response_currency = value_at(body, &extract.currency)
-        .and_then(|value| value.as_str())
-        .map(|text| text.trim().to_ascii_uppercase())
-        .filter(|text| !text.is_empty());
     let currency = response_currency
         .clone()
         .unwrap_or_else(|| query.currency.trim().to_ascii_uppercase());
@@ -917,6 +962,48 @@ mod tests {
         assert_eq!(snapshot.currency, "CNY", "币种应统一大写");
         assert_eq!(snapshot.used, None);
         assert!(snapshot.daily.is_empty());
+    }
+
+    /// DeepSeek 的余额接口会同时回美元与人民币两行，账号只在一个币种下有钱：
+    /// 「币种分组」必须挑出余额**非零**的那一行，而不是固定取第 0 行（$0.00）。
+    #[test]
+    fn balance_group_prefers_nonzero_entry() {
+        let query = query_with(UsageExtract {
+            balance_group: "balance_infos".to_string(),
+            balance: "total_balance".to_string(),
+            currency: "currency".to_string(),
+            ..UsageExtract::default()
+        });
+        let body = json!({
+            "is_available": true,
+            "balance_infos": [
+                { "currency": "USD", "total_balance": "0.00", "topped_up_balance": "0.00" },
+                { "currency": "CNY", "total_balance": "62.72", "topped_up_balance": "62.72" }
+            ]
+        });
+        let snapshot = parse_snapshot(&body, &query).unwrap();
+        assert_eq!(snapshot.balance, Some(62.72), "应取人民币那一行");
+        assert_eq!(snapshot.currency, "CNY");
+    }
+
+    /// 余额确实为零（两行都是 0）时退回第一行：0 是合法余额，不能因此判「取不到」。
+    #[test]
+    fn balance_group_falls_back_to_first_entry_when_all_zero() {
+        let query = query_with(UsageExtract {
+            balance_group: "balance_infos".to_string(),
+            balance: "total_balance".to_string(),
+            currency: "currency".to_string(),
+            ..UsageExtract::default()
+        });
+        let body = json!({
+            "balance_infos": [
+                { "currency": "USD", "total_balance": "0.00" },
+                { "currency": "CNY", "total_balance": "0.00" }
+            ]
+        });
+        let snapshot = parse_snapshot(&body, &query).unwrap();
+        assert_eq!(snapshot.balance, Some(0.0));
+        assert_eq!(snapshot.currency, "USD", "全部为零时退回第一行");
     }
 
     #[test]

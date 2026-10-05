@@ -222,6 +222,13 @@ impl Default for SupplierUsageQuery {
 pub struct UsageExtract {
     /// 余额字段路径。
     pub balance: String,
+    /// 余额所属的「币种分组数组」路径（如 DeepSeek 的 `balance_infos`）。
+    ///
+    /// 非空时，[`Self::balance`] / [`Self::currency`] 改为**相对每个分组元素**取值：
+    /// 解析时先从数组里挑出「余额非零」的那一组（多家平台会同时回美元与人民币两行，
+    /// 账号实际只在一种币种下有钱，另一行是 `0.00` 的占位），全部为零或取不到时
+    /// 退回第一组。空路径表示余额字段直接按根路径取值（旧行为，不变）。
+    pub balance_group: String,
     /// 已用额度字段路径。
     pub used: String,
     /// 总额度字段路径。
@@ -311,6 +318,7 @@ impl Default for UsageExtract {
     fn default() -> Self {
         Self {
             balance: String::new(),
+            balance_group: String::new(),
             used: String::new(),
             total: String::new(),
             currency: String::new(),
