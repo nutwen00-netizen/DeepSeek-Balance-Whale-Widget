@@ -415,6 +415,7 @@ pub fn normalize_usage_query(query: &mut SupplierUsageQuery) {
         .collect();
     query.extract = UsageExtract {
         balance: query.extract.balance.trim().to_string(),
+        balance_group: query.extract.balance_group.trim().to_string(),
         used: query.extract.used.trim().to_string(),
         total: query.extract.total.trim().to_string(),
         currency: query.extract.currency.trim().to_string(),
