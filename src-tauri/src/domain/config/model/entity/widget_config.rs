@@ -41,7 +41,7 @@ pub struct WidgetConfig {
     /// 边缘吸附阈值（占屏幕物理宽度比例 0–1；0 表示未设置，回退四分之一区域）。
     #[serde(default)]
     pub snap_distance: f64,
-    /// 余额显示币种（六种之一，默认人民币）。
+    /// 余额显示币种（`auto` = 跟随账户原生币种；或六种受支持币种之一，默认 `auto`）。
     #[serde(default = "default_display_currency")]
     pub display_currency: String,
     /// 当前挂件本体（图片组名）；「小鲸鱼」表示内置默认资源。

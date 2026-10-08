@@ -116,7 +116,7 @@ mod tests {
         assert_eq!(cfg.api_key, "sk-x");
         assert_eq!(cfg.base_url, DEFAULT_BASE_URL);
         assert_eq!(cfg.codex_base_url, DEFAULT_CODEX_BASE_URL);
-        assert_eq!(cfg.widget.display_currency, "CNY");
+        assert_eq!(cfg.widget.display_currency, "auto");
         assert_eq!(cfg.dialogue.mode, "random");
         assert!(cfg.widget_position.is_none());
         assert_eq!(cfg.global_theme, DEFAULT_THEME, "旧配置缺字段时回落浅色");

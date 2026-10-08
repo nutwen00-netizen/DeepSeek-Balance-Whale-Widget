@@ -15,7 +15,9 @@ use crate::domain::config::model::{
     DEFAULT_CODEX_BASE_URL, DEFAULT_COLOR, DEFAULT_THEME, THEMES,
 };
 use crate::domain::widget_image::service::widget_image_service as widget_rules;
-use crate::types::enums::{Currency, DialogueMode, HorizontalAnchor, VerticalAnchor};
+use crate::types::enums::{
+    normalize_display_currency, DialogueMode, HorizontalAnchor, VerticalAnchor,
+};
 use crate::types::exception::{AppError, AppResult};
 
 /// 失望阈值上限（分钟）：24 小时。
@@ -227,9 +229,7 @@ fn normalize_widget(widget: &mut WidgetConfig) {
     if !(0.0..1.0).contains(&widget.snap_distance) {
         widget.snap_distance = 0.0;
     }
-    widget.display_currency = Currency::parse_or_default(&widget.display_currency)
-        .as_str()
-        .to_string();
+    widget.display_currency = normalize_display_currency(&widget.display_currency);
     widget.widget_body = widget.widget_body.trim().to_string();
     if widget.widget_body.is_empty() {
         widget.widget_body = widget_rules::DEFAULT_BODY.to_string();
@@ -314,7 +314,7 @@ mod tests {
         assert_eq!(ok.widget.sound_set, "我的音效");
     }
 
-    /// 币种：非法值回落 CNY，合法值保留。
+    /// 币种：合法值保留、非法值回落默认人民币；`auto` / 空串归为「跟随账户」。
     #[test]
     fn display_currency_is_validated() {
         let mut cfg = AppConfig::default();
@@ -325,6 +325,10 @@ mod tests {
         cfg.widget.display_currency = "xyz".to_string();
         normalize(&mut cfg);
         assert_eq!(cfg.widget.display_currency, "CNY");
+
+        cfg.widget.display_currency = "AUTO".to_string();
+        normalize(&mut cfg);
+        assert_eq!(cfg.widget.display_currency, "auto");
     }
 
     /// 台词模式：仅 carousel / random 合法；空行被过滤；数值被钳制。

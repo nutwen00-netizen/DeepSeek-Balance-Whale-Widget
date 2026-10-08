@@ -4,7 +4,7 @@
 
 use crate::domain::bubble::model::entity::bubble_config::DEFAULT_BUBBLE_GROUP;
 use crate::domain::config::model::{AppConfig, DialogueConfig, WidgetConfig, WidgetPosition};
-use crate::types::enums::Currency;
+use crate::types::enums::{normalize_display_currency, Currency};
 use crate::types::exception::AppResult;
 use crate::application::config::result::ConfigSaveOutcome;
 use crate::application::registry;
@@ -104,10 +104,10 @@ pub fn save_dialogue(dialogue: DialogueConfig) -> AppResult<DialogueConfig> {
 }
 
 /// 切换余额显示币种。
+///
+/// `auto`（或空串）表示「跟随账户原生币种」，其余按受支持币种解析（非法值回落默认）。
 pub fn set_currency(currency: &str) -> AppResult<WidgetConfig> {
-    let code = Currency::parse_loose_or_default(currency)
-        .as_str()
-        .to_string();
+    let code = normalize_display_currency(currency);
     let cfg = registry::config().mutate(Box::new(move |c| c.widget.display_currency = code))?;
     Ok(cfg.widget)
 }

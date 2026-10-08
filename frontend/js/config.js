@@ -342,6 +342,7 @@
 
   // 币种切换可选项（与后端 SUPPORTED_CURRENCIES 保持一致）。
   const CURRENCY_OPTIONS = [
+    { value: "auto", text: "跟随账户币种（默认）", deletable: false },
     { value: "CNY", text: "人民币（CNY / ¥）", deletable: false },
     { value: "USD", text: "美元（USD / $）", deletable: false },
     { value: "EUR", text: "欧元（EUR / €）", deletable: false },
@@ -647,10 +648,7 @@
     );
     w.exhaustedBalanceThreshold = isFinite(threshold) ? threshold : 5;
     exhaustedBalanceThresholdEl.value = String(w.exhaustedBalanceThreshold);
-    currencyPicker.sync(
-      CURRENCY_SYMBOL[w.displayCurrency] ? w.displayCurrency : "CNY",
-      "CNY",
-    );
+    currencyPicker.sync(w.displayCurrency || "auto", "auto");
     w.peakWarnEnabled = w.peakWarnEnabled !== false;
     peakWarnEnabledEl.checked = w.peakWarnEnabled;
     const pw = Math.max(1, Math.floor(Number(w.peakWarnMinutes) || 9));
@@ -1355,12 +1353,7 @@
       )
         .then(function (widget) {
           config.widget = widget;
-          currencyPicker.sync(
-            CURRENCY_SYMBOL[widget && widget.displayCurrency]
-              ? widget.displayCurrency
-              : "CNY",
-            "CNY",
-          );
+          currencyPicker.sync(widget && widget.displayCurrency, "auto");
           refreshBalance();
         })
         .catch(function (err) {
@@ -1369,7 +1362,7 @@
     },
     null,
   );
-  currencyPicker.setItems(CURRENCY_OPTIONS, "CNY");
+  currencyPicker.setItems(CURRENCY_OPTIONS, "auto");
 
   // 播放模式：同样使用自定义下拉，与币种切换等保持一致的交互与样式。
   const dialogueModePicker = createPicker(

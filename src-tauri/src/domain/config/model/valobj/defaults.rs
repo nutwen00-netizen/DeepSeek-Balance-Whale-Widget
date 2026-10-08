@@ -4,7 +4,7 @@
 //! `#[serde(default = "...")]` 引用（字段缺失时的兜底），也供
 //! [`crate::domain::config::service::config_service`] 的规范化规则复用。
 
-use crate::types::enums::{Currency, DialogueMode};
+use crate::types::enums::DialogueMode;
 
 /// DeepSeek 官方 API 默认根地址（可被用户自定义覆盖）。
 pub(crate) const DEFAULT_BASE_URL: &str = "https://api.deepseek.com/anthropic";
@@ -86,9 +86,12 @@ pub(crate) fn default_peak_warn_minutes() -> u32 {
     9
 }
 
-/// 返回默认显示币种。
+/// 返回默认显示币种：默认「跟随账户原生币种」。
+///
+/// 不固定为人民币：美元结算的账户若默认按 CNY 展示，会被套 USD→CNY 汇率放大成约 7 倍，
+/// 用户会以为余额 / 今日已用显示错误。跟随账户可让首次安装「所见即账户币种」。
 pub(crate) fn default_display_currency() -> String {
-    Currency::DEFAULT.as_str().to_string()
+    crate::types::enums::currency::AUTO.to_string()
 }
 
 /// 返回默认挂件本体。

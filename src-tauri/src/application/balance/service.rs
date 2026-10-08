@@ -14,7 +14,7 @@ use crate::application::usage;
 use crate::domain::balance::model::BalancePayload;
 use crate::domain::config::model::AppConfig;
 use crate::domain::supplier::service::supplier_service::{self, BALANCE_SCOPE};
-use crate::types::enums::Currency;
+use crate::types::enums::currency::{normalize_display_currency, AUTO};
 use crate::types::enums::ErrorCode;
 use crate::types::exception::AppError;
 use crate::application::registry;
@@ -72,15 +72,23 @@ async fn payload_for(cfg: &AppConfig, scope: &str, slug: &str) -> BalancePayload
     } else {
         report.currency
     };
-    let display_currency = Currency::parse_loose_or_default(&cfg.widget.display_currency);
-    let (display_currency, rate) = if display_currency.as_str() == currency {
-        (display_currency.as_str().to_string(), 1.0)
+    // 显示币种：配置为「跟随账户」（auto，默认）时直接展示账户原生币种、不做汇率换算。
+    // 美元结算的账户若默认按 CNY 展示，会被套 USD→CNY 汇率放大成约 7 倍，用户会以为
+    // 余额 / 今日已用显示错误——因此默认跟随账户，只有用户显式选了币种才换算。
+    let configured = normalize_display_currency(&cfg.widget.display_currency);
+    let display_currency = if configured == AUTO {
+        currency.clone()
+    } else {
+        configured
+    };
+    let (display_currency, rate) = if display_currency == currency {
+        (display_currency, 1.0)
     } else {
         match registry::exchange_rate()
-            .rate(&currency, display_currency.as_str())
+            .rate(&currency, &display_currency)
             .await
         {
-            Ok(rate) => (display_currency.as_str().to_string(), rate),
+            Ok(rate) => (display_currency, rate),
             Err(e) => {
                 log::warn!("获取汇率失败，回退原始币种 {}: {}", currency, e);
                 (currency.clone(), 1.0)
