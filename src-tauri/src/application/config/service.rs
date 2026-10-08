@@ -4,7 +4,7 @@
 
 use crate::domain::bubble::model::entity::bubble_config::DEFAULT_BUBBLE_GROUP;
 use crate::domain::config::model::{AppConfig, DialogueConfig, WidgetConfig, WidgetPosition};
-use crate::types::enums::{normalize_display_currency, Currency};
+use crate::types::enums::normalize_display_currency;
 use crate::types::exception::AppResult;
 use crate::application::config::result::ConfigSaveOutcome;
 use crate::application::registry;
@@ -154,6 +154,7 @@ fn balance_source_changed(previous: &AppConfig, next: &AppConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::enums::Currency;
 
     fn with_source(api_key: &str, base_url: &str) -> AppConfig {
         AppConfig {

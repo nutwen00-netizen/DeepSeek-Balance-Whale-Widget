@@ -26,7 +26,7 @@ pub mod widget;
 pub mod window;
 
 pub use audio::AudioMode;
-pub use currency::Currency;
+pub use currency::{normalize_display_currency, Currency};
 pub use dialogue::DialogueMode;
 pub use error::ErrorCode;
 pub use pricing::{DateKind, PeakPeriod};
